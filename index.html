@@ -264,6 +264,21 @@ async function cargar(){
  * fecha, con la de hoy abierta y las anteriores plegadas, se ve de un vistazo
  * qué requiere atención AHORA.
  */
+/**
+ * Engancha TODOS los desplegables de la pagina.
+ *
+ * Se llama al final de cada pintado. Antes cada funcion enganchaba los suyos y
+ * la de cumplimiento se olvido: las cabeceras estaban pero no abrian. Una sola
+ * funcion que recorre la pagina entera evita que vuelva a pasar.
+ */
+function engancharDesplegables(){
+  document.querySelectorAll('.dia-cab').forEach(b => {
+    if(b.dataset.on) return;          // ya enganchado
+    b.dataset.on = '1';
+    b.onclick = () => b.parentNode.classList.toggle('abierto');
+  });
+}
+
 function fechaCorta(iso){
   if(!iso) return 'sin fecha';
   const hoy = new Date().toISOString().slice(0,10);
@@ -301,9 +316,7 @@ function pintarAlertas(av){
       }).join('') + '</div></div>';
   }).join('');
 
-  c.querySelectorAll('.dia-cab').forEach(b => {
-    b.onclick = () => b.parentNode.classList.toggle('abierto');
-  });
+  engancharDesplegables();
 }
 
 function pintarUsuarios(){
@@ -467,6 +480,10 @@ function pintarCumplimiento(){
         '</div></div>').join('')
     : '<div class="aviso bien"><b>Todo marcado</b>No hay tareas obligatorias sin registrar ' +
       'en los últimos días.</div>';
+
+  // Los desplegables se enganchan DESPUES de pintar. pintarAlertas lo hacia y
+  // esta no: creaba las cabeceras pero sin onclick, asi que no se abrian.
+  engancharDesplegables();
 }
 
 document.getElementById('quien').innerHTML =
