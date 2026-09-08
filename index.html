@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#101311">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Administración · Vivace</title>
+<script>
+(function(){
+  var RUTA_PORTAL = '/Portal/';
+  try{
+    var s = JSON.parse(localStorage.getItem('vivace_sesion')||'null');
+    if(!s || !s.token || Date.now()-s.creada > 14*3600*1000){ location.replace(RUTA_PORTAL); }
+    else if(String(s.rol||'').toLowerCase() !== 'jefe'){
+      /* La comprobación de verdad está en el backend; esto solo evita que
+         alguien sin permisos vea una pantalla que no le va a funcionar. */
+      document.addEventListener('DOMContentLoaded', function(){
+        document.body.innerHTML = '<div style="padding:40px;text-align:center;color:#9aa89e;' +
+          'font-family:system-ui,sans-serif">Esta pantalla es solo para el rol <b>jefe</b>.' +
+          '<br><br><a href="/Portal/" style="color:#7aa7d9">Volver al portal</a></div>';
+      });
+    } else { window.VIVACE_USER = s; }
+  }catch(e){ location.replace(RUTA_PORTAL); }
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,700..900&family=Inter:wght@400;600;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root{--fondo:#101311;--tarjeta:#1a1f1b;--linea:#2a322c;--papel:#f2ede4;--tinta:#9aa89e;
+        --ok:#58c281;--sube:#ff5d45;--baja:#7aa7d9;--aviso:#ffb020}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{background:var(--fondo);color:var(--papel);font-family:'Inter',system-ui,sans-serif;padding-bottom:40px}
+  .marco{max-width:840px;margin:0 auto;min-height:100vh}
+  header{position:sticky;top:0;background:var(--fondo);border-bottom:1px solid var(--linea);padding:13px 16px 0;z-index:8}
+  .h-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  h1{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:900;font-size:17px;letter-spacing:.5px;text-transform:uppercase}
+  h1 small{color:var(--tinta);font-family:'Space Mono',monospace;font-size:10.5px;display:block;margin-top:3px;text-transform:none;letter-spacing:0}
+  #quien{color:var(--tinta);font-size:11px;text-align:right;line-height:1.5}
+  #quien a{color:var(--tinta)}
+  nav{display:flex;gap:6px;margin-top:11px;overflow-x:auto;scrollbar-width:none;padding-bottom:11px}
+  nav::-webkit-scrollbar{display:none}
+  nav button{flex:0 0 auto;background:var(--tarjeta);border:1px solid var(--linea);color:var(--tinta);
+    padding:9px 14px;border-radius:8px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;
+    text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+  nav button.on{background:var(--papel);color:var(--fondo);border-color:var(--papel)}
+  main{padding:14px 16px}
+  .panel{display:none} .panel.on{display:block}
+  .card{background:var(--tarjeta);border:1px solid var(--linea);border-radius:12px;padding:14px;margin-bottom:11px}
+  .card h2{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-size:12px;
+    text-transform:uppercase;letter-spacing:.7px;color:var(--tinta);margin-bottom:10px}
+  label{display:block;font-size:11.5px;color:var(--tinta);margin:11px 0 5px;font-weight:600}
+  input,select,textarea{width:100%;background:var(--fondo);border:1px solid var(--linea);color:var(--papel);
+    border-radius:9px;padding:11px 12px;font-size:15px;font-family:inherit}
+  input:focus,select:focus{outline:none;border-color:var(--tinta)}
+  .fila2{display:flex;gap:9px}.fila2>*{flex:1}
+  .btn{width:100%;background:var(--papel);color:var(--fondo);border:none;border-radius:10px;
+    padding:13px;font-size:13.5px;font-weight:800;font-family:inherit;cursor:pointer;margin-top:14px;
+    text-transform:uppercase;letter-spacing:.5px}
+  .btn:disabled{opacity:.45}
+  .btn.sec{background:transparent;color:var(--papel);border:1px solid var(--linea)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;color:var(--tinta);font-size:10px;text-transform:uppercase;letter-spacing:.5px;
+    padding:0 6px 7px;font-weight:700}
+  td{padding:8px 6px;border-top:1px solid var(--linea);font-variant-numeric:tabular-nums}
+  td.n,th.n{text-align:right}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .p-ok{background:rgba(88,194,129,.16);color:var(--ok)}
+  .p-mal{background:rgba(255,93,69,.16);color:var(--sube)}
+  .p-avi{background:rgba(255,176,32,.16);color:var(--aviso)}
+  .p-off{background:var(--linea);color:var(--tinta)}
+  .nota{font-size:11.5px;color:var(--tinta);line-height:1.55;margin-top:9px}
+  .aviso{border-left:3px solid var(--aviso);background:rgba(255,176,32,.07);padding:10px 12px;
+    border-radius:0 8px 8px 0;font-size:12.5px;line-height:1.55;margin-bottom:10px}
+  .aviso.mal{border-color:var(--sube);background:rgba(255,93,69,.07)}
+  .aviso.bien{border-color:var(--ok);background:rgba(88,194,129,.07)}
+  .aviso b{display:block;margin-bottom:2px}
+  .kpi{display:flex;gap:9px;margin-bottom:12px;flex-wrap:wrap}
+  .kpi div{flex:1;min-width:100px;background:var(--tarjeta);border:1px solid var(--linea);
+    border-radius:10px;padding:11px 9px;text-align:center}
+  .kpi b{display:block;font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:900;font-size:20px;
+    font-variant-numeric:tabular-nums}
+  .kpi span{font-size:9.5px;color:var(--tinta);text-transform:uppercase;letter-spacing:.4px}
+  .usr{display:flex;align-items:center;gap:11px;padding:11px 0;border-top:1px solid var(--linea)}
+  .usr .info{flex:1;min-width:0}
+  .usr .nom{font-size:14px;font-weight:600}
+  .usr .meta{font-size:11px;color:var(--tinta);margin-top:2px}
+  .usr button{background:transparent;border:1px solid var(--linea);color:var(--papel);
+    border-radius:8px;padding:7px 12px;font-size:11.5px;font-family:inherit;cursor:pointer;flex:0 0 auto}
+  .dia{border-top:1px solid var(--linea);padding:11px 0}
+  .dia .nom{font-size:12.5px;font-weight:700;text-transform:capitalize;margin-bottom:6px}
+  .turno{display:flex;gap:7px;align-items:center;margin-bottom:6px;font-size:12px}
+  .turno input{padding:7px 9px;font-size:13px}
+  .turno .u{flex:1.4}.turno .t{flex:.9}.turno .f{flex:1.2}
+  .turno button{background:none;border:none;color:var(--sube);font-size:16px;cursor:pointer;padding:0 4px}
+  #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:var(--papel);color:var(--fondo);
+    padding:12px 20px;border-radius:24px;font-size:13px;font-weight:700;opacity:0;transition:opacity .25s;
+    pointer-events:none;z-index:40;max-width:88%;text-align:center;line-height:1.4}
+  #toast.on{opacity:1}
+  .vacio{color:var(--tinta);font-size:12.5px;text-align:center;padding:24px 10px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="marco">
+  <header>
+    <div class="h-top">
+      <h1>Administración<small id="hfecha">—</small></h1>
+      <div id="quien"></div>
+    </div>
+    <nav>
+      <button data-p="alertas" class="on">Alertas</button>
+      <button data-p="equipo">Equipo</button>
+      <button data-p="horarios">Horarios</button>
+      <button data-p="cumplimiento">Cumplimiento</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="panel on" id="p-alertas">
+      <div id="alertas"><div class="vacio">Cargando…</div></div>
+    </section>
+
+    <section class="panel" id="p-equipo">
+      <div class="card">
+        <h2>Equipo</h2>
+        <div id="usuarios"></div>
+        <button class="btn sec" id="b-nuevo">Añadir persona</button>
+      </div>
+      <div class="card" id="form-usr" style="display:none">
+        <h2 id="form-titulo">Nueva persona</h2>
+        <label>Nombre</label>
+        <input id="u-nombre" placeholder="Cómo aparece en los registros">
+        <label>Usuario</label>
+        <input id="u-login" placeholder="sin acentos ni espacios" autocapitalize="off">
+        <p class="nota">El usuario es la clave con la que se enlazan turnos, fichajes y registros de
+        producción. <b>Nunca se cambia</b>: si esa plaza la ocupa otra persona, se desactiva esta
+        y se crea una nueva, para que el histórico siga diciendo quién hizo cada cosa.</p>
+        <div class="fila2">
+          <div><label>Contraseña</label><input id="u-pass" placeholder="vacío = no cambiar"></div>
+          <div><label>Teléfono</label><input id="u-tel" inputmode="tel"></div>
+        </div>
+        <label>Rol</label>
+        <select id="u-rol">
+          <option value="jefe">jefe — ve todo y puede corregir registros ajenos</option>
+          <option value="pizzaiolo">pizzaiolo</option>
+          <option value="preparacion">preparación</option>
+          <option value="encargado">encargado</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:14px">
+          <input type="checkbox" id="u-activo" checked style="width:auto"> Activo
+        </label>
+        <div class="fila2" style="margin-top:6px">
+          <button class="btn sec" id="b-cancelar">Cancelar</button>
+          <button class="btn" id="b-guardar-usr">Guardar</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="p-horarios">
+      <div class="card">
+        <h2>Horario semanal</h2>
+        <div id="horarios"></div>
+        <p class="nota">Los turnos que cruzan medianoche se escriben tal cual: entrada 18:00,
+        salida 02:00. El sistema entiende que acaban al día siguiente.</p>
+        <button class="btn" id="b-guardar-hor">Guardar horarios</button>
+      </div>
+    </section>
+
+    <section class="panel" id="p-cumplimiento">
+      <div class="kpi" id="kpi-cump"></div>
+      <div class="card">
+        <h2>Fichajes recientes</h2>
+        <table><thead><tr><th>fecha</th><th>quién</th><th>entrada</th>
+          <th class="n">retraso</th><th>salida</th><th class="n">horas</th></tr></thead>
+        <tbody id="t-fichajes"></tbody></table>
+      </div>
+      <div class="card">
+        <h2>Tareas obligatorias sin marcar</h2>
+        <div id="t-tareas"></div>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script>
+/* ⚠ CONFIGURAR: misma URL /exec del Apps Script del Director */
+const API = 'https://script.google.com/macros/s/AKfycbxR12l4LsPLVBLGYIp70JNP4rX9q2UyFKaEpzoVuLTGHwByYNgbauk051r6BAFKOsN7Wg/exec';
+
+let D = null;
+const DIAS = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+function tok(){ return (window.VIVACE_USER||{}).token || ''; }
+function esc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+function jsonp(params){
+  return new Promise((res, rej) => {
+    const cb = 'cb' + Math.random().toString(36).slice(2);
+    const s = document.createElement('script');
+    const t = setTimeout(() => { delete window[cb]; s.remove(); rej(new Error('tiempo de espera agotado')); }, 25000);
+    window[cb] = d => { clearTimeout(t); delete window[cb]; s.remove(); res(d); };
+    params.token = tok();
+    const q = Object.entries(params).map(([k,v]) => k+'='+encodeURIComponent(v===undefined?'':v)).join('&');
+    s.src = API + '?' + q + '&callback=' + cb;
+    s.onerror = () => { clearTimeout(t); delete window[cb]; s.remove(); rej(new Error('sin conexión')); };
+    document.body.appendChild(s);
+  });
+}
+async function post(body){
+  const r = await fetch(API, { method:'POST', redirect:'follow',
+    headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify(Object.assign({}, body, { token: tok() })) });
+  return r.json();
+}
+let toastT;
+function toast(m){
+  const t = document.getElementById('toast');
+  t.textContent = m; t.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 3600);
+}
+
+document.querySelectorAll('nav button').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('nav button').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('.panel').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    document.getElementById('p-' + b.dataset.p).classList.add('on');
+  };
+});
+
+async function cargar(){
+  try{
+    const [adm, al] = await Promise.all([
+      jsonp({ action:'rh_admin' }), jsonp({ action:'rh_alertas' })
+    ]);
+    if(!adm.ok) throw new Error(adm.error || 'sin permiso');
+    D = adm;
+    pintarAlertas(al.avisos || []);
+    pintarUsuarios(); pintarHorarios(); pintarCumplimiento();
+    document.getElementById('hfecha').textContent =
+      new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+  }catch(e){
+    document.getElementById('alertas').innerHTML =
+      '<div class="aviso mal">No se pudo cargar: ' + esc(e.message) + '</div>';
+  }
+}
+
+function pintarAlertas(av){
+  const c = document.getElementById('alertas');
+  if(!av.length){
+    c.innerHTML = '<div class="aviso bien"><b>Sin alertas</b>El sistema no ha detectado nada ' +
+      'que requiera tu atención: entran datos, las tareas se marcan y los horarios se cumplen.</div>';
+    return;
+  }
+  const ORDEN = { ingesta:0, datos:1, recuento:2, masa:3, recepcion:4, horario:5, tarea:6, tareas:6, apertura:7 };
+  av.sort((a,b) => (ORDEN[a.tipo]===undefined?9:ORDEN[a.tipo]) - (ORDEN[b.tipo]===undefined?9:ORDEN[b.tipo]));
+  c.innerHTML = av.map(a => {
+    const grave = ['ingesta','datos'].indexOf(a.tipo) >= 0;
+    return '<div class="aviso' + (grave ? ' mal' : '') + '">' +
+      '<b>' + esc(a.tipo) + (a.usuario ? ' · ' + esc(a.usuario) : '') +
+      (a.fecha ? ' · ' + esc(a.fecha) : '') + '</b>' + esc(a.detalle) + '</div>';
+  }).join('');
+}
+
+function pintarUsuarios(){
+  document.getElementById('usuarios').innerHTML = (D.usuarios||[]).map(u =>
+    '<div class="usr"><div class="info"><div class="nom">' + esc(u.nombre) + '</div>' +
+    '<div class="meta">' + esc(u.usuario) + ' · ' + esc(u.rol) +
+    (u.telefono ? ' · ' + esc(u.telefono) : '') + '</div></div>' +
+    '<span class="pill ' + (u.activo?'p-ok':'p-off') + '">' + (u.activo?'activo':'inactivo') + '</span>' +
+    '<button data-u="' + esc(u.usuario) + '">Editar</button></div>').join('');
+  document.querySelectorAll('#usuarios button').forEach(b => {
+    b.onclick = () => abrirUsuario((D.usuarios||[]).find(x => x.usuario === b.dataset.u));
+  });
+}
+
+function abrirUsuario(u){
+  document.getElementById('form-usr').style.display = 'block';
+  document.getElementById('form-titulo').textContent = u ? 'Editar ' + u.nombre : 'Nueva persona';
+  document.getElementById('u-nombre').value = u ? u.nombre : '';
+  document.getElementById('u-login').value = u ? u.usuario : '';
+  document.getElementById('u-login').disabled = !!u;
+  document.getElementById('u-pass').value = '';
+  document.getElementById('u-tel').value = u ? (u.telefono||'') : '';
+  document.getElementById('u-rol').value = u ? u.rol : 'preparacion';
+  document.getElementById('u-activo').checked = u ? u.activo : true;
+  document.getElementById('form-usr').scrollIntoView({ behavior:'smooth' });
+}
+document.getElementById('b-nuevo').onclick = () => abrirUsuario(null);
+document.getElementById('b-cancelar').onclick = () => {
+  document.getElementById('form-usr').style.display = 'none';
+};
+document.getElementById('b-guardar-usr').onclick = async function(){
+  const datos = {
+    nombre: document.getElementById('u-nombre').value.trim(),
+    usuario: document.getElementById('u-login').value.trim().toLowerCase(),
+    password: document.getElementById('u-pass').value,
+    telefono: document.getElementById('u-tel').value.trim(),
+    rol: document.getElementById('u-rol').value,
+    activo: document.getElementById('u-activo').checked
+  };
+  if(!datos.usuario) return toast('Falta el nombre de usuario');
+  this.disabled = true;
+  try{
+    const r = await post({ action:'rh_usuario', datos: datos });
+    if(!r.ok) throw new Error(r.error || 'error');
+    toast(r.creado ? 'Persona añadida' : 'Cambios guardados');
+    document.getElementById('form-usr').style.display = 'none';
+    await cargar();
+  }catch(e){ toast('No se pudo guardar: ' + e.message); }
+  finally{ this.disabled = false; }
+};
+
+function pintarHorarios(){
+  const porDia = {};
+  (D.horarios||[]).forEach(h => { (porDia[h.diaSemana] = porDia[h.diaSemana] || []).push(h); });
+  let out = '';
+  for(let d = 1; d <= 7; d++){
+    const t = porDia[d] || [];
+    out += '<div class="dia" data-dia="' + d + '"><div class="nom">' + DIAS[d] + '</div>' +
+      t.map(x => filaTurno(x)).join('') + filaTurno(null) + '</div>';
+  }
+  document.getElementById('horarios').innerHTML = out;
+  document.querySelectorAll('.turno button').forEach(b => {
+    b.onclick = () => { b.parentNode.remove(); };
+  });
+}
+function filaTurno(x){
+  const us = (D.usuarios||[]).filter(u => u.activo)
+    .map(u => '<option value="' + esc(u.usuario) + '"' +
+      (x && x.usuario === u.usuario ? ' selected' : '') + '>' + esc(u.nombre) + '</option>').join('');
+  return '<div class="turno">' +
+    '<select class="u"><option value="">—</option>' + us + '</select>' +
+    '<input class="t" type="time" value="' + (x ? esc(x.entrada) : '') + '">' +
+    '<input class="t" type="time" value="' + (x ? esc(x.salida) : '') + '">' +
+    '<select class="f">' +
+      ['produccion','servicio','produccion+servicio'].map(f =>
+        '<option value="' + f + '"' + (x && x.funcion === f ? ' selected' : '') + '>' +
+        f.replace('+',' y ') + '</option>').join('') +
+    '</select><button>✕</button></div>';
+}
+document.getElementById('b-guardar-hor').onclick = async function(){
+  this.disabled = true; this.textContent = 'Guardando…';
+  try{
+    const cambios = [];
+    document.querySelectorAll('.dia').forEach(div => {
+      const dia = parseInt(div.dataset.dia, 10);
+      const porUsuario = {};
+      div.querySelectorAll('.turno').forEach(t => {
+        const u = t.querySelector('.u').value;
+        const ins = t.querySelectorAll('input');
+        if(!u || !ins[0].value || !ins[1].value) return;
+        (porUsuario[u] = porUsuario[u] || []).push({
+          entrada: ins[0].value, salida: ins[1].value, funcion: t.querySelector('.f').value });
+      });
+      // Se manda también a quien se quedó sin turnos, para que se le borren
+      (D.usuarios||[]).forEach(u => {
+        const tenia = (D.horarios||[]).some(h => h.diaSemana === dia && h.usuario === u.usuario);
+        if(porUsuario[u.usuario] || tenia)
+          cambios.push({ usuario: u.usuario, dia: dia, turnos: porUsuario[u.usuario] || [] });
+      });
+    });
+    for(const c of cambios){
+      const r = await post({ action:'rh_horario', usuario:c.usuario, dia:c.dia, turnos:c.turnos });
+      if(!r.ok) throw new Error(r.error || 'error');
+    }
+    toast('Horarios guardados');
+    await cargar();
+  }catch(e){ toast('No se pudo guardar: ' + e.message); }
+  finally{ this.disabled = false; this.textContent = 'Guardar horarios'; }
+};
+
+function pintarCumplimiento(){
+  const r = D.resumen || {};
+  const nombres = Object.keys(r);
+  document.getElementById('kpi-cump').innerHTML = nombres.length
+    ? nombres.map(u => {
+        const x = r[u];
+        return '<div><b>' + x.turnos + '</b><span>' + esc(u) + '</span>' +
+          '<div style="font-size:10px;color:var(--tinta);margin-top:4px">' +
+          x.retrasos + ' retraso(s) · ' + Math.round(x.horas) + ' h</div></div>';
+      }).join('')
+    : '<div><b>—</b><span>sin fichajes</span></div>';
+
+  document.getElementById('t-fichajes').innerHTML = (D.fichajes||[]).length
+    ? (D.fichajes||[]).slice().reverse().map(f => {
+        const tarde = f.retraso > (D.tolerancia || 30);
+        return '<tr><td>' + esc(f.fecha) + '</td><td>' + esc(f.usuario) + '</td>' +
+          '<td>' + esc(f.real) + '</td>' +
+          '<td class="n">' + (tarde ? '<span class="pill p-mal">+' + f.retraso + '</span>'
+                                    : (f.retraso > 0 ? '+' + f.retraso : '—')) + '</td>' +
+          '<td>' + esc(f.salida || '—') +
+            (f.tipo === 'asumida' ? ' <span class="pill p-avi">asumida</span>' : '') + '</td>' +
+          '<td class="n">' + (f.horas ? f.horas.toFixed(1) : '—') + '</td></tr>';
+      }).join('')
+    : '<tr><td colspan="6" class="vacio">Aún no hay fichajes registrados.</td></tr>';
+
+  const t = D.tareasSinHacer || [];
+  document.getElementById('t-tareas').innerHTML = t.length
+    ? t.map(x => '<div class="aviso"><b>' + esc(x.fecha) + ' · ' + esc(x.estado) + '</b>' +
+        esc(x.titulo) + (x.modulo ? ' — ' + esc(x.modulo) : '') + '</div>').join('')
+    : '<div class="aviso bien"><b>Todo marcado</b>No hay tareas obligatorias sin registrar ' +
+      'en los últimos días.</div>';
+}
+
+document.getElementById('quien').innerHTML =
+  ((window.VIVACE_USER||{}).nombre || '') + '<br><a href="/Portal/">← portal</a>';
+cargar();
+</script>
+</body>
+</html>
