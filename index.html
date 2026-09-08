@@ -98,6 +98,16 @@
     padding:12px 20px;border-radius:24px;font-size:13px;font-weight:700;opacity:0;transition:opacity .25s;
     pointer-events:none;z-index:40;max-width:88%;text-align:center;line-height:1.4}
   #toast.on{opacity:1}
+  .dia-bloque{border:1px solid var(--linea);border-radius:10px;margin-bottom:8px;overflow:hidden}
+  .dia-cab{width:100%;background:var(--tarjeta);border:none;color:var(--papel);padding:11px 13px;
+    display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;
+    font-family:inherit;font-size:13px;font-weight:700;text-align:left;text-transform:capitalize}
+  .dia-cab em{font-style:normal;font-size:11px;color:var(--tinta);font-weight:400;text-transform:none}
+  .dia-cab:after{content:'+';color:var(--tinta);font-size:15px;flex:0 0 auto;margin-left:4px}
+  .dia-bloque.abierto .dia-cab:after{content:'−'}
+  .dia-cuerpo{display:none;padding:11px 13px;border-top:1px solid var(--linea)}
+  .dia-bloque.abierto .dia-cuerpo{display:block}
+  .dia-cuerpo .aviso:last-child{margin-bottom:0}
   .vacio{color:var(--tinta);font-size:12.5px;text-align:center;padding:24px 10px;line-height:1.6}
 </style>
 </head>
@@ -246,6 +256,24 @@ async function cargar(){
   }
 }
 
+/**
+ * Alertas agrupadas por día.
+ *
+ * Una lista corrida de treinta avisos es ilegible: no se distingue lo de hoy
+ * de lo de la semana pasada, y todo parece igual de urgente. Agrupadas por
+ * fecha, con la de hoy abierta y las anteriores plegadas, se ve de un vistazo
+ * qué requiere atención AHORA.
+ */
+function fechaCorta(iso){
+  if(!iso) return 'sin fecha';
+  const hoy = new Date().toISOString().slice(0,10);
+  const ayer = new Date(Date.now()-86400000).toISOString().slice(0,10);
+  if(iso === hoy) return 'Hoy';
+  if(iso === ayer) return 'Ayer';
+  const d = new Date(iso + 'T12:00:00');
+  return d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'});
+}
+
 function pintarAlertas(av){
   const c = document.getElementById('alertas');
   if(!av.length){
@@ -254,13 +282,28 @@ function pintarAlertas(av){
     return;
   }
   const ORDEN = { ingesta:0, datos:1, recuento:2, masa:3, recepcion:4, horario:5, tarea:6, tareas:6, apertura:7 };
-  av.sort((a,b) => (ORDEN[a.tipo]===undefined?9:ORDEN[a.tipo]) - (ORDEN[b.tipo]===undefined?9:ORDEN[b.tipo]));
-  c.innerHTML = av.map(a => {
-    const grave = ['ingesta','datos'].indexOf(a.tipo) >= 0;
-    return '<div class="aviso' + (grave ? ' mal' : '') + '">' +
-      '<b>' + esc(a.tipo) + (a.usuario ? ' · ' + esc(a.usuario) : '') +
-      (a.fecha ? ' · ' + esc(a.fecha) : '') + '</b>' + esc(a.detalle) + '</div>';
+  const porDia = {};
+  av.forEach(a => { (porDia[a.fecha || ''] = porDia[a.fecha || ''] || []).push(a); });
+  const dias = Object.keys(porDia).sort().reverse();
+
+  c.innerHTML = dias.map((f, i) => {
+    const lista = porDia[f].sort((a,b) =>
+      (ORDEN[a.tipo]===undefined?9:ORDEN[a.tipo]) - (ORDEN[b.tipo]===undefined?9:ORDEN[b.tipo]));
+    const graves = lista.filter(a => ['ingesta','datos'].indexOf(a.tipo) >= 0).length;
+    return '<div class="dia-bloque' + (i === 0 ? ' abierto' : '') + '">' +
+      '<button class="dia-cab"><span>' + esc(fechaCorta(f)) + '</span>' +
+      '<em>' + lista.length + (graves ? ' · ' + graves + ' urgente(s)' : '') + '</em></button>' +
+      '<div class="dia-cuerpo">' + lista.map(a => {
+        const grave = ['ingesta','datos'].indexOf(a.tipo) >= 0;
+        return '<div class="aviso' + (grave ? ' mal' : '') + '">' +
+          '<b>' + esc(a.tipo) + (a.usuario ? ' · ' + esc(a.usuario) : '') + '</b>' +
+          esc(a.detalle) + '</div>';
+      }).join('') + '</div></div>';
   }).join('');
+
+  c.querySelectorAll('.dia-cab').forEach(b => {
+    b.onclick = () => b.parentNode.classList.toggle('abierto');
+  });
 }
 
 function pintarUsuarios(){
@@ -383,23 +426,45 @@ function pintarCumplimiento(){
       }).join('')
     : '<div><b>—</b><span>sin fichajes</span></div>';
 
-  document.getElementById('t-fichajes').innerHTML = (D.fichajes||[]).length
-    ? (D.fichajes||[]).slice().reverse().map(f => {
-        const tarde = f.retraso > (D.tolerancia || 30);
-        return '<tr><td>' + esc(f.fecha) + '</td><td>' + esc(f.usuario) + '</td>' +
-          '<td>' + esc(f.real) + '</td>' +
-          '<td class="n">' + (tarde ? '<span class="pill p-mal">+' + f.retraso + '</span>'
-                                    : (f.retraso > 0 ? '+' + f.retraso : '—')) + '</td>' +
-          '<td>' + esc(f.salida || '—') +
-            (f.tipo === 'asumida' ? ' <span class="pill p-avi">asumida</span>' : '') + '</td>' +
-          '<td class="n">' + (f.horas ? f.horas.toFixed(1) : '—') + '</td></tr>';
-      }).join('')
-    : '<tr><td colspan="6" class="vacio">Aún no hay fichajes registrados.</td></tr>';
+  // Fichajes por día, no en una tabla corrida: así se ve el turno completo de
+  // cada jornada junto, que es como se mira el cumplimiento.
+  const fPorDia = {};
+  (D.fichajes||[]).forEach(f => { (fPorDia[f.fecha] = fPorDia[f.fecha] || []).push(f); });
+  const fDias = Object.keys(fPorDia).sort().reverse();
 
-  const t = D.tareasSinHacer || [];
-  document.getElementById('t-tareas').innerHTML = t.length
-    ? t.map(x => '<div class="aviso"><b>' + esc(x.fecha) + ' · ' + esc(x.estado) + '</b>' +
-        esc(x.titulo) + (x.modulo ? ' — ' + esc(x.modulo) : '') + '</div>').join('')
+  document.getElementById('t-fichajes').innerHTML = fDias.length
+    ? fDias.map((d, i) => {
+        const l = fPorDia[d];
+        const tarde = l.filter(f => f.retraso > (D.tolerancia || 30)).length;
+        return '<div class="dia-bloque' + (i < 2 ? ' abierto' : '') + '">' +
+          '<button class="dia-cab"><span>' + esc(fechaCorta(d)) + '</span>' +
+          '<em>' + l.length + ' turno(s)' +
+            (tarde ? ' · <b style="color:var(--sube)">' + tarde + ' con retraso</b>' : '') + '</em></button>' +
+          '<div class="dia-cuerpo"><table><thead><tr><th>quién</th><th>entrada</th>' +
+          '<th class="n">retraso</th><th>salida</th><th class="n">horas</th></tr></thead><tbody>' +
+          l.map(f => {
+            const t2 = f.retraso > (D.tolerancia || 30);
+            return '<tr><td>' + esc(f.usuario) + '</td><td>' + esc(f.real) + '</td>' +
+              '<td class="n">' + (t2 ? '<span class="pill p-mal">+' + f.retraso + '</span>'
+                                     : (f.retraso > 0 ? '+' + f.retraso : '—')) + '</td>' +
+              '<td>' + esc(f.salida || '—') +
+                (f.tipo === 'asumida' ? ' <span class="pill p-avi">asumida</span>' : '') + '</td>' +
+              '<td class="n">' + (f.horas ? f.horas.toFixed(1) : '—') + '</td></tr>';
+          }).join('') + '</tbody></table></div></div>';
+      }).join('')
+    : '<div class="vacio">Aún no hay fichajes registrados.<br>Aparecerán en cuanto alguien inicie sesión dentro de su turno.</div>';
+
+  // Tareas sin hacer, también por día
+  const tPorDia = {};
+  (D.tareasSinHacer||[]).forEach(x => { (tPorDia[x.fecha] = tPorDia[x.fecha] || []).push(x); });
+  const tDias = Object.keys(tPorDia).sort().reverse();
+  document.getElementById('t-tareas').innerHTML = tDias.length
+    ? tDias.map((d, i) => '<div class="dia-bloque' + (i === 0 ? ' abierto' : '') + '">' +
+        '<button class="dia-cab"><span>' + esc(fechaCorta(d)) + '</span>' +
+        '<em>' + tPorDia[d].length + ' sin marcar</em></button><div class="dia-cuerpo">' +
+        tPorDia[d].map(x => '<div class="aviso"><b>' + esc(x.estado) + '</b>' +
+          esc(x.titulo) + (x.modulo ? ' — ' + esc(x.modulo) : '') + '</div>').join('') +
+        '</div></div>').join('')
     : '<div class="aviso bien"><b>Todo marcado</b>No hay tareas obligatorias sin registrar ' +
       'en los últimos días.</div>';
 }
